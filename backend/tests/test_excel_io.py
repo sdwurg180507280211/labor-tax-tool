@@ -38,8 +38,14 @@ def test_template_can_be_read_by_reader():
     assert rows[0].after_tax_amount == Decimal("3000")
 
 
-def test_logic_test_template_covers_key_calculation_scenarios():
+def test_logic_test_template_has_expected_result_sheet_and_scenarios():
     data = build_logic_test_workbook()
+    wb = load_workbook(BytesIO(data), data_only=True)
+    assert wb.sheetnames == ["逻辑测试数据", "说明", "预期结果说明"]
+    expected_ws = wb["预期结果说明"]
+    assert expected_ws["A1"].value == "场景编号"
+    assert expected_ws["A13"].value == "T12"
+
     rows = read_labor_rows(BytesIO(data))
     assert len(rows) == 21
 
@@ -60,16 +66,23 @@ def test_logic_test_template_covers_key_calculation_scenarios():
     assert len({row.id_no for row in same_name_rows}) == 2
 
 
-def test_error_test_template_is_intentionally_invalid():
+def test_error_test_template_reports_all_invalid_rows_with_chinese_messages():
     data = build_error_test_workbook()
     with pytest.raises(ValueError) as exc_info:
         read_labor_rows(BytesIO(data))
     message = str(exc_info.value)
-    assert "第 2 行" in message
-    assert "year" in message
+    assert "第 2 行：年份不能为空" in message
+    assert "第 3 行：月份不能为空" in message
+    assert "第 4 行：月份必须在1-12之间" in message
+    assert "第 5 行：身份证号码不能为空" in message
+    assert "第 6 行：姓名不能为空" in message
+    assert "第 7 行：税后劳务金额不能为空" in message
+    assert "第 8 行：税后劳务金额必须大于0" in message
+    assert "第 9 行：税后劳务金额必须大于0" in message
+    assert "第 10 行：税后劳务金额必须是数字" in message
 
 
-def test_result_workbook_has_value_sheets_and_formula_sheet():
+def test_result_workbook_has_value_sheets_and_formula_sheet_for_normal_data():
     data = build_result_workbook([make_row(400), make_row(500)])
     wb = load_workbook(BytesIO(data), data_only=False)
     assert wb.sheetnames == ["劳务费税费换算台账", "清晰版台账", "公式版台账"]
@@ -96,3 +109,16 @@ def test_result_workbook_has_value_sheets_and_formula_sheet():
     assert ws3["Q7"].value.startswith("=IFERROR(")
     assert ws3["S7"].value.startswith("=MAX(0,")
     assert ws3["X7"].value == "=J7+Q7+R7-O7"
+
+
+def test_logic_test_export_includes_test_check_report_with_all_passed():
+    logic_rows = read_labor_rows(BytesIO(build_logic_test_workbook()))
+    data = build_result_workbook(logic_rows)
+    wb = load_workbook(BytesIO(data), data_only=True)
+    assert wb.sheetnames == ["劳务费税费换算台账", "清晰版台账", "公式版台账", "测试核对报告"]
+
+    report = wb["测试核对报告"]
+    assert report["A1"].value == "场景编号"
+    assert report["E2"].value == "通过"
+    statuses = [report.cell(row=row_idx, column=5).value for row_idx in range(2, report.max_row + 1)]
+    assert set(statuses) == {"通过"}
