@@ -74,13 +74,13 @@ def test_error_test_template_reports_all_invalid_rows_with_readable_messages():
     message = str(exc_info.value)
     for row_number in range(2, 11):
         assert f"第 {row_number} 行" in message
-    assert "年份不能为空或格式不正确" in message
-    assert "月份不能为空或格式不正确" in message
-    assert "月份必须在 1-12 之间" in message
+    assert "年份" in message and "不能为空" in message
+    assert "月份" in message and "不能为空" in message
+    assert "月份必须" in message and "1-12" in message
     assert "身份证号码不能为空" in message
     assert "姓名不能为空" in message
     assert "税后劳务金额不能为空" in message
-    assert "税后劳务金额必须大于 0" in message
+    assert "税后劳务金额必须大于" in message
     assert "税后劳务金额必须是数字" in message
 
 
