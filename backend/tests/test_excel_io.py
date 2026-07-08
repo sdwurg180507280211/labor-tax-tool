@@ -2,10 +2,16 @@ from decimal import Decimal
 from io import BytesIO
 
 from openpyxl import load_workbook
+import pytest
 
 from app.schemas.labor import LaborInputRow
 from app.services.excel_reader import read_labor_rows
-from app.services.excel_writer import build_result_workbook, build_template_workbook
+from app.services.excel_writer import (
+    build_error_test_workbook,
+    build_logic_test_workbook,
+    build_result_workbook,
+    build_template_workbook,
+)
 
 
 def make_row(amount=3000):
@@ -30,6 +36,37 @@ def test_template_can_be_read_by_reader():
     assert rows[0].month == 6
     assert rows[0].name == "张三"
     assert rows[0].after_tax_amount == Decimal("3000")
+
+
+def test_logic_test_template_covers_key_calculation_scenarios():
+    data = build_logic_test_workbook()
+    rows = read_labor_rows(BytesIO(data))
+    assert len(rows) == 21
+
+    names = [row.name for row in rows]
+    assert "测试A-免税累计" in names
+    assert "测试B-跨800" in names
+    assert "测试F-超过49500" in names
+    assert "测试G-增值税临界500" in names
+    assert "测试H-增值税超过500" in names
+
+    cross_month = [row for row in rows if row.id_no == "110101199001010009"]
+    assert [row.month for row in cross_month] == [6, 7]
+
+    cross_year = [row for row in rows if row.id_no == "110101199001010010"]
+    assert [row.year for row in cross_year] == [2026, 2027]
+
+    same_name_rows = [row for row in rows if row.name == "张三"]
+    assert len({row.id_no for row in same_name_rows}) == 2
+
+
+def test_error_test_template_is_intentionally_invalid():
+    data = build_error_test_workbook()
+    with pytest.raises(ValueError) as exc_info:
+        read_labor_rows(BytesIO(data))
+    message = str(exc_info.value)
+    assert "第2行" in message
+    assert "年份不能为空" in message
 
 
 def test_result_workbook_has_value_sheets_and_formula_sheet():
