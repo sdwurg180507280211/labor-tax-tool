@@ -9,10 +9,23 @@ from fastapi.responses import StreamingResponse
 
 from app.schemas.labor import LaborInputRow, ManualCalculateRequest
 from app.services.excel_reader import read_labor_rows
-from app.services.excel_writer import build_result_workbook, build_template_workbook
+from app.services.excel_writer import (
+    build_error_test_workbook,
+    build_logic_test_workbook,
+    build_result_workbook,
+    build_template_workbook,
+)
 from app.services.tax_calculator import calculate_rows, money2
 
 router = APIRouter(prefix="/api", tags=["labor-tax"])
+
+
+def _download_workbook(data: bytes, filename: str) -> StreamingResponse:
+    return StreamingResponse(
+        BytesIO(data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 def _rows_response(input_rows: list[LaborInputRow]) -> dict[str, Any]:
@@ -44,12 +57,17 @@ def health() -> dict[str, str]:
 
 @router.get("/template")
 def download_template() -> StreamingResponse:
-    data = build_template_workbook()
-    return StreamingResponse(
-        BytesIO(data),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=labor_fee_input_template.xlsx"},
-    )
+    return _download_workbook(build_template_workbook(), "labor_fee_input_template.xlsx")
+
+
+@router.get("/test-template/logic")
+def download_logic_test_template() -> StreamingResponse:
+    return _download_workbook(build_logic_test_workbook(), "labor_fee_logic_test_template.xlsx")
+
+
+@router.get("/test-template/error")
+def download_error_test_template() -> StreamingResponse:
+    return _download_workbook(build_error_test_workbook(), "labor_fee_error_test_template.xlsx")
 
 
 @router.post("/calculate/upload")
@@ -75,9 +93,4 @@ def calculate_manual(payload: ManualCalculateRequest) -> dict[str, Any]:
 def export_result(payload: ManualCalculateRequest) -> StreamingResponse:
     if not payload.rows:
         raise HTTPException(status_code=400, detail="没有可导出的数据。")
-    data = build_result_workbook(payload.rows)
-    return StreamingResponse(
-        BytesIO(data),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=labor_fee_tax_ledger.xlsx"},
-    )
+    return _download_workbook(build_result_workbook(payload.rows), "labor_fee_tax_ledger.xlsx")
