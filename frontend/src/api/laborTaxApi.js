@@ -9,10 +9,22 @@ async function handleJsonResponse(response) {
 }
 
 export async function downloadTemplate() {
-  const response = await fetch(`${API_BASE}/api/template`)
-  if (!response.ok) throw new Error('模板下载失败')
+  await downloadWorkbook('/api/template', '劳务费基础数据导入模板.xlsx', '模板下载失败')
+}
+
+export async function downloadLogicTestTemplate() {
+  await downloadWorkbook('/api/test-template/logic', '劳务费逻辑测试模板.xlsx', '逻辑测试模板下载失败')
+}
+
+export async function downloadErrorTestTemplate() {
+  await downloadWorkbook('/api/test-template/error', '劳务费异常测试模板.xlsx', '异常测试模板下载失败')
+}
+
+async function downloadWorkbook(path, filename, errorMessage) {
+  const response = await fetch(`${API_BASE}${path}`)
+  if (!response.ok) throw new Error(errorMessage)
   const blob = await response.blob()
-  downloadBlob(blob, '劳务费基础数据导入模板.xlsx')
+  downloadBlob(blob, filename)
 }
 
 export async function calculateUpload(file) {
