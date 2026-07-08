@@ -43,7 +43,7 @@ HEADER_ALIASES: dict[str, str] = {
 }
 
 REQUIRED_FIELDS = {"year", "month", "name", "id_no", "after_tax_amount"}
-FIELD_LABELS = {
+FIELD_NAMES = {
     "year": "年份",
     "month": "月份",
     "name": "姓名",
@@ -80,35 +80,36 @@ def find_header_row(ws) -> tuple[int, dict[int, str]]:
 
 def _format_validation_error(err: dict[str, Any]) -> str:
     field = str(err.get("loc", [""])[0])
-    label = FIELD_LABELS.get(field, field)
-    message = str(err.get("msg", "校验失败"))
     error_type = str(err.get("type", ""))
+    message = str(err.get("msg", ""))
+    field_name = FIELD_NAMES.get(field, field)
 
     if field == "year":
-        if err.get("input") is None or "None" in message or error_type == "missing":
-            return "年份不能为空"
-        if "greater than or equal" in message or "less than or equal" in message:
-            return "年份必须在1900-2999之间"
-        return "年份必须是数字"
+        if "greater_than_equal" in error_type or "less_than_equal" in error_type:
+            return "年份必须在 1900-2999 之间"
+        return "年份不能为空或格式不正确"
+
     if field == "month":
-        if err.get("input") is None or "None" in message or error_type == "missing":
-            return "月份不能为空"
-        if "greater than or equal" in message or "less than or equal" in message:
-            return "月份必须在1-12之间"
-        return "月份必须是数字"
+        if "greater_than_equal" in error_type or "less_than_equal" in error_type:
+            return "月份必须在 1-12 之间"
+        return "月份不能为空或格式不正确"
+
     if field == "name":
         return "姓名不能为空"
+
     if field == "id_no":
         return "身份证号码不能为空"
+
     if field == "after_tax_amount":
-        if "不能为空" in message:
+        if "税后劳务金额不能为空" in message:
             return "税后劳务金额不能为空"
-        if "必须是数字" in message:
+        if "税后劳务金额必须是数字" in message:
             return "税后劳务金额必须是数字"
-        if "greater than" in message:
-            return "税后劳务金额必须大于0"
+        if "greater_than" in error_type:
+            return "税后劳务金额必须大于 0"
         return "税后劳务金额格式不正确"
-    return f"{label}：{message}"
+
+    return f"{field_name}：{message}"
 
 
 def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
@@ -118,7 +119,7 @@ def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
     found_fields = set(col_to_field.values())
     missing = REQUIRED_FIELDS - found_fields
     if missing:
-        raise ValueError("缺少必填列：" + "、".join(FIELD_LABELS[x] for x in sorted(missing)))
+        raise ValueError("缺少必填列：" + "、".join(FIELD_NAMES[x] for x in sorted(missing)))
 
     rows: list[LaborInputRow] = []
     errors: list[str] = []
