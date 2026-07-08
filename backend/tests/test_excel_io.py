@@ -32,10 +32,10 @@ def test_template_can_be_read_by_reader():
     assert rows[0].after_tax_amount == Decimal("3000")
 
 
-def test_result_workbook_has_two_expected_sheets_and_values_only():
+def test_result_workbook_has_value_sheets_and_formula_sheet():
     data = build_result_workbook([make_row(400), make_row(500)])
     wb = load_workbook(BytesIO(data), data_only=False)
-    assert wb.sheetnames == ["劳务费税费换算台账", "清晰版台账"]
+    assert wb.sheetnames == ["劳务费税费换算台账", "清晰版台账", "公式版台账"]
 
     ws1 = wb["劳务费税费换算台账"]
     assert ws1["A2"].value == "劳务费税前（后）相关税费换算台账"
@@ -49,3 +49,13 @@ def test_result_workbook_has_two_expected_sheets_and_values_only():
     ws2 = wb["清晰版台账"]
     assert ws2["A1"].value == "基础信息"
     assert ws2["W2"].value == "核对结果"
+
+    ws3 = wb["公式版台账"]
+    assert ws3["A2"].value == "劳务费税前（后）相关税费换算台账"
+    assert ws3["A6"].value == 1
+    assert ws3["J6"].value == Decimal("400.00")
+    assert ws3["K7"].value.startswith("=SUMIFS(")
+    assert ws3["L7"].value.startswith("=IF(")
+    assert ws3["Q7"].value.startswith("=IFERROR(")
+    assert ws3["S7"].value.startswith("=MAX(0,")
+    assert ws3["X7"].value == "=J7+Q7+R7-O7"
