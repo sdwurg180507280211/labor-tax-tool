@@ -87,11 +87,15 @@ def build_template_workbook() -> bytes:
 def build_result_workbook(input_rows: list[LaborInputRow]) -> bytes:
     calculated_rows = calculate_rows(input_rows)
     wb = Workbook()
+    wb.calculation.fullCalcOnLoad = True
+    wb.calculation.forceFullCalc = True
     ws1 = wb.active
     ws1.title = "劳务费税费换算台账"
     _write_original_style_sheet(ws1, calculated_rows)
     ws2 = wb.create_sheet("清晰版台账")
     _write_clear_sheet(ws2, calculated_rows)
+    ws3 = wb.create_sheet("公式版台账")
+    _write_formula_sheet(ws3, calculated_rows)
     return _save_workbook(wb)
 
 
@@ -217,6 +221,81 @@ def _write_original_style_sheet(ws, rows: Iterable[LaborCalculatedRow]) -> None:
         ws.cell(6, 1, "无数据")
     ws.freeze_panes = "A6"
     ws.auto_filter.ref = f"A5:X{max(row_idx - 1, 6)}"
+
+
+def _current_iit_formula(pre_tax_ref: str) -> str:
+    return (
+        f"IF({pre_tax_ref}<=800,0,"
+        f"IF({pre_tax_ref}<=4000,({pre_tax_ref}-800)*20%,"
+        f"IF({pre_tax_ref}*80%<=20000,{pre_tax_ref}*80%*20%,"
+        f"IF({pre_tax_ref}*80%<=50000,{pre_tax_ref}*80%*30%-2000,{pre_tax_ref}*80%*40%-7000))))"
+    )
+
+
+def _prior_sumifs(sum_col: str, row_idx: int) -> str:
+    if row_idx <= 6:
+        return "0"
+    prev = row_idx - 1
+    return (
+        f"SUMIFS(${sum_col}$6:{sum_col}{prev},"
+        f"$B$6:B{prev},B{row_idx},"
+        f"$C$6:C{prev},C{row_idx},"
+        f"$I$6:I{prev},I{row_idx})"
+    )
+
+
+def _running_sumifs(sum_col: str, row_idx: int) -> str:
+    return (
+        f"SUMIFS(${sum_col}$6:{sum_col}{row_idx},"
+        f"$B$6:B{row_idx},B{row_idx},"
+        f"$C$6:C{row_idx},C{row_idx},"
+        f"$I$6:I{row_idx},I{row_idx})"
+    )
+
+
+def _write_formula_sheet(ws, rows: Iterable[LaborCalculatedRow]) -> None:
+    row_list = list(rows)
+    _write_original_style_sheet(ws, row_list)
+    ws["A1"] = "标黄处为基础输入；K-X列保留Excel公式"
+    ws["J1"] = "手动填写支付的劳务费金额；计算列为公式"
+
+    for row_idx, _item in enumerate(row_list, start=6):
+        k = f"K{row_idx}"
+        l = f"L{row_idx}"
+        q = f"Q{row_idx}"
+        r = f"R{row_idx}"
+        s = f"S{row_idx}"
+        t = f"T{row_idx}"
+        u = f"U{row_idx}"
+        v = f"V{row_idx}"
+        m = f"M{row_idx}"
+        n = f"N{row_idx}"
+        o = f"O{row_idx}"
+        p = f"P{row_idx}"
+        x = f"X{row_idx}"
+
+        formulas = {
+            k: f"={_running_sumifs('J', row_idx)}",
+            l: f"=IF({k}<=800,{k},IF({k}<=3360,({k}-160)/0.8,IF({k}<=21000,{k}/0.84,IF({k}<=49500,({k}-2000)/0.76,({k}-7000)/0.68))))",
+            q: f"=IFERROR(IF(J{row_idx}/{k}*{l}<=500,0,J{row_idx}/{k}*{l}*1%),0)",
+            r: f"={q}*12%*50%",
+            s: f"=MAX(0,{_current_iit_formula(l)}-{_prior_sumifs('S', row_idx)})",
+            t: f"={_running_sumifs('Q', row_idx)}",
+            u: f"={_running_sumifs('R', row_idx)}",
+            v: f"={_running_sumifs('S', row_idx)}",
+            m: f"={l}+{t}+{u}",
+            n: f"=MAX(0,{m}-{_prior_sumifs('N', row_idx)})",
+            o: f"={n}-{s}",
+            p: f"={_running_sumifs('O', row_idx)}",
+            x: f"=J{row_idx}+{q}+{r}-{o}",
+        }
+        for coord, formula in formulas.items():
+            cell = ws[coord]
+            cell.value = formula
+            cell.number_format = MONEY_FORMAT
+            cell.border = BORDER_THIN
+            cell.alignment = CENTER
+        ws[f"W{row_idx}"] = None
 
 
 def _write_clear_sheet(ws, rows: Iterable[LaborCalculatedRow]) -> None:
