@@ -37,7 +37,7 @@
       <div class="result-actions">
         <div>
           <h2>计算结果预览</h2>
-          <p>页面仅展示核心字段；导出 Excel 会包含“原表格式台账”“清晰版台账”“公式版台账”三个 Sheet。</p>
+          <p>页面仅展示核心字段；导出 Excel 会包含“原表格式台账”“清晰版台账”“公式版台账”“测试核对报告”四个 Sheet。</p>
         </div>
         <div class="action-row">
           <button class="secondary" @click="clearResult">清空结果</button>
