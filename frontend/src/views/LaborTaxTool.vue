@@ -13,6 +13,16 @@
       </div>
     </section>
 
+    <section class="card tool-options">
+      <label class="test-mode-toggle">
+        <input v-model="testMode" type="checkbox" />
+        <span>
+          <strong>测试模式</strong>
+          <em>开启后，结果预览会显示累计维度、税后反推档位、个税档位、增值税规则和核对状态，方便排查公式逻辑。</em>
+        </span>
+      </label>
+    </section>
+
     <section class="card">
       <div class="tabs">
         <button :class="['tab', activeTab === 'upload' && 'active']" @click="activeTab = 'upload'">上传 Excel</button>
@@ -38,13 +48,14 @@
         <div>
           <h2>计算结果预览</h2>
           <p>页面仅展示核心字段；导出 Excel 会包含“原表格式台账”“清晰版台账”“公式版台账”“测试核对报告”四个 Sheet。</p>
+          <p v-if="testMode" class="debug-hint">测试模式已开启：当前表格额外显示每行计算档位和公式排查信息。</p>
         </div>
         <div class="action-row">
           <button class="secondary" @click="clearResult">清空结果</button>
           <button class="primary" :disabled="loading" @click="handleExport">导出完整台账 Excel</button>
         </div>
       </div>
-      <ResultTable :rows="resultRows" />
+      <ResultTable :rows="resultRows" :debug-mode="testMode" />
     </section>
   </main>
 </template>
@@ -69,6 +80,7 @@ const error = ref('')
 const resultRows = ref([])
 const inputRows = ref([])
 const summary = ref(null)
+const testMode = ref(false)
 
 async function runTask(task) {
   loading.value = true
