@@ -43,6 +43,13 @@ HEADER_ALIASES: dict[str, str] = {
 }
 
 REQUIRED_FIELDS = {"year", "month", "name", "id_no", "after_tax_amount"}
+FIELD_LABELS = {
+    "year": "年份",
+    "month": "月份",
+    "name": "姓名",
+    "id_no": "身份证号码",
+    "after_tax_amount": "税后劳务金额",
+}
 
 
 def normalize_header(value: Any) -> str:
@@ -71,6 +78,39 @@ def find_header_row(ws) -> tuple[int, dict[int, str]]:
     raise ValueError("未识别到表头。请使用模板，或确保包含：年份、月份、姓名、身份证号码、税后劳务金额。")
 
 
+def _format_validation_error(err: dict[str, Any]) -> str:
+    field = str(err.get("loc", [""])[0])
+    label = FIELD_LABELS.get(field, field)
+    message = str(err.get("msg", "校验失败"))
+    error_type = str(err.get("type", ""))
+
+    if field == "year":
+        if err.get("input") is None or "None" in message or error_type == "missing":
+            return "年份不能为空"
+        if "greater than or equal" in message or "less than or equal" in message:
+            return "年份必须在1900-2999之间"
+        return "年份必须是数字"
+    if field == "month":
+        if err.get("input") is None or "None" in message or error_type == "missing":
+            return "月份不能为空"
+        if "greater than or equal" in message or "less than or equal" in message:
+            return "月份必须在1-12之间"
+        return "月份必须是数字"
+    if field == "name":
+        return "姓名不能为空"
+    if field == "id_no":
+        return "身份证号码不能为空"
+    if field == "after_tax_amount":
+        if "不能为空" in message:
+            return "税后劳务金额不能为空"
+        if "必须是数字" in message:
+            return "税后劳务金额必须是数字"
+        if "greater than" in message:
+            return "税后劳务金额必须大于0"
+        return "税后劳务金额格式不正确"
+    return f"{label}：{message}"
+
+
 def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
     wb = load_workbook(file_obj, data_only=True)
     ws = wb.active
@@ -78,14 +118,7 @@ def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
     found_fields = set(col_to_field.values())
     missing = REQUIRED_FIELDS - found_fields
     if missing:
-        names = {
-            "year": "年份",
-            "month": "月份",
-            "name": "姓名",
-            "id_no": "身份证号码",
-            "after_tax_amount": "税后劳务金额",
-        }
-        raise ValueError("缺少必填列：" + "、".join(names[x] for x in sorted(missing)))
+        raise ValueError("缺少必填列：" + "、".join(FIELD_LABELS[x] for x in sorted(missing)))
 
     rows: list[LaborInputRow] = []
     errors: list[str] = []
@@ -102,7 +135,7 @@ def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
         try:
             rows.append(LaborInputRow(**raw))
         except ValidationError as exc:
-            msg = "; ".join(f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in exc.errors())
+            msg = "；".join(_format_validation_error(err) for err in exc.errors())
             errors.append(f"第 {excel_row_idx} 行：{msg}")
 
     if errors:
