@@ -90,7 +90,63 @@ class LaborCalculatedRow(LaborInputRow):
             "cumulative_surcharge_amount": money2(self.cumulative_surcharge_amount),
             "cumulative_individual_tax_amount": money2(self.cumulative_individual_tax_amount),
             "check_amount": money2(self.check_amount),
+            "debug_info": self.debug_dict(),
         }
+
+    def debug_dict(self) -> dict[str, Any]:
+        """Detailed calculation labels used by the frontend test mode."""
+        from app.services.tax_calculator import money2
+
+        allocated_pre_tax = (
+            self.after_tax_amount / self.cumulative_after_tax_amount * self.cumulative_pre_tax_without_vat
+            if self.cumulative_after_tax_amount
+            else Decimal("0")
+        )
+        taxable_income = self.cumulative_pre_tax_without_vat * Decimal("0.8")
+
+        return {
+            "cumulative_key": f"{self.year}-{self.month:02d}-{self.id_no}",
+            "pre_tax_bracket": self._pre_tax_bracket_label(),
+            "individual_tax_bracket": self._individual_tax_bracket_label(taxable_income),
+            "allocated_pre_tax_amount": money2(allocated_pre_tax),
+            "vat_rule": "本次对应税前≤500：增值税=0" if allocated_pre_tax <= Decimal("500") else "本次对应税前>500：增值税=本次对应税前×1%",
+            "threshold_note": self._threshold_note(),
+            "check_ok": "是" if abs(self.check_amount) <= Decimal("0.0049") else "否",
+        }
+
+    def _pre_tax_bracket_label(self) -> str:
+        amount = self.cumulative_after_tax_amount
+        if amount <= Decimal("800"):
+            return "累计税后≤800：税前=税后"
+        if amount <= Decimal("3360"):
+            return "累计税后≤3360：税前=(税后-160)÷0.8"
+        if amount <= Decimal("21000"):
+            return "累计税后≤21000：税前=税后÷0.84"
+        if amount <= Decimal("49500"):
+            return "累计税后≤49500：税前=(税后-2000)÷0.76"
+        return "累计税后>49500：税前=(税后-7000)÷0.68"
+
+    def _individual_tax_bracket_label(self, taxable_income: Decimal) -> str:
+        pre_tax = self.cumulative_pre_tax_without_vat
+        if pre_tax <= Decimal("800"):
+            return "累计税前≤800：个税=0"
+        if pre_tax <= Decimal("4000"):
+            return "累计税前≤4000：个税=(税前-800)×20%"
+        if taxable_income <= Decimal("20000"):
+            return "应纳税所得额≤20000：税率20%"
+        if taxable_income <= Decimal("50000"):
+            return "应纳税所得额≤50000：税率30%，速算扣除2000"
+        return "应纳税所得额>50000：税率40%，速算扣除7000"
+
+    def _threshold_note(self) -> str:
+        amount = self.cumulative_after_tax_amount
+        thresholds = []
+        for threshold in (Decimal("800"), Decimal("3360"), Decimal("21000"), Decimal("49500")):
+            if amount > threshold:
+                thresholds.append(str(threshold))
+        if not thresholds:
+            return "未跨过800"
+        return "已跨过：" + "、".join(thresholds)
 
 
 class ManualCalculateRequest(BaseModel):
