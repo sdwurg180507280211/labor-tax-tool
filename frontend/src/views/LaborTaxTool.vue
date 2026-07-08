@@ -6,7 +6,11 @@
         <h1>劳务费税费换算工具</h1>
         <p class="desc">上传或录入基础劳务明细，系统按“年份 + 月份 + 身份证号码”累计，自动计算税前金额、个税、增值税、附加税、应开票金额和应付款金额。</p>
       </div>
-      <button class="secondary" @click="handleDownloadTemplate">下载导入模板</button>
+      <div class="template-actions">
+        <button class="secondary" @click="handleDownloadTemplate">下载导入模板</button>
+        <button class="secondary" @click="handleDownloadLogicTestTemplate">下载逻辑测试模板</button>
+        <button class="secondary danger-soft" @click="handleDownloadErrorTestTemplate">下载异常测试模板</button>
+      </div>
     </section>
 
     <section class="card">
@@ -33,7 +37,7 @@
       <div class="result-actions">
         <div>
           <h2>计算结果预览</h2>
-          <p>页面仅展示核心字段；导出 Excel 会包含“原表格式台账”和“清晰版台账”两个 Sheet。</p>
+          <p>页面仅展示核心字段；导出 Excel 会包含“原表格式台账”“清晰版台账”“公式版台账”三个 Sheet。</p>
         </div>
         <div class="action-row">
           <button class="secondary" @click="clearResult">清空结果</button>
@@ -50,7 +54,14 @@ import { ref } from 'vue'
 import UploadPanel from '../components/UploadPanel.vue'
 import ManualTable from '../components/ManualTable.vue'
 import ResultTable from '../components/ResultTable.vue'
-import { calculateManual, calculateUpload, downloadTemplate, exportLedger } from '../api/laborTaxApi'
+import {
+  calculateManual,
+  calculateUpload,
+  downloadErrorTestTemplate,
+  downloadLogicTestTemplate,
+  downloadTemplate,
+  exportLedger
+} from '../api/laborTaxApi'
 
 const activeTab = ref('upload')
 const loading = ref(false)
@@ -79,6 +90,14 @@ function applyResult(payload) {
 
 function handleDownloadTemplate() {
   runTask(async () => downloadTemplate())
+}
+
+function handleDownloadLogicTestTemplate() {
+  runTask(async () => downloadLogicTestTemplate())
+}
+
+function handleDownloadErrorTestTemplate() {
+  runTask(async () => downloadErrorTestTemplate())
 }
 
 function handleUploadCalculate(file) {
