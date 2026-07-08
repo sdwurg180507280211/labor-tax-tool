@@ -6,10 +6,9 @@ from typing import Iterable
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
 
 from app.schemas.labor import LaborCalculatedRow, LaborInputRow
-from app.services.tax_calculator import calculate_rows, money2_decimal
+from app.services.tax_calculator import calculate_rows, money2, money2_decimal
 
 TEMPLATE_HEADERS = [
     "年份",
@@ -47,12 +46,27 @@ LOGIC_TEST_ROWS = [
     [2026, 6, "测试事业部", "北京", "测试报销人", "测试会计", "测试L-不同人同月", "110101199001010014", 1800],
 ]
 
+EXPECTED_RESULT_ROWS = [
+    ["T01", "累计税后≤800", "第2行累计税后", "700.00", "K列/本月累计税后应为700，个税仍为0"],
+    ["T02", "同人同月跨过800", "第4行累计税后与个税", "900.00 / 25.00", "累计进入个税区间，单次个税按累计拆分"],
+    ["T03", "3360内档位", "第5行累计税前", "3550.00", "税前=(3000-160)/0.8"],
+    ["T04", "21000内档位", "第7行累计税前", "17857.14", "累计税后15000，税前=15000/0.84"],
+    ["T05", "49500内档位", "第9行累计税前", "39473.68", "累计税后32000，税前=(32000-2000)/0.76"],
+    ["T06", "超过49500档位", "第11行累计税前", "77941.18", "累计税后60000，税前=(60000-7000)/0.68"],
+    ["T07", "增值税500临界", "第12行增值税", "0.00", "本次对应税前金额≤500，不计增值税"],
+    ["T08", "增值税超过500", "第13行增值税", ">0", "本次对应税前金额>500，按1%计增值税"],
+    ["T09", "跨月重置累计", "第15行累计税后", "3000.00", "同身份证7月应重新累计"],
+    ["T10", "跨年同月重置累计", "第17行累计税后", "3000.00", "同身份证2027年6月应重新累计"],
+    ["T11", "同名不同身份证", "第18/19行累计税后", "3000.00 / 3000.00", "不能按姓名累计，必须按身份证累计"],
+    ["T12", "不同人同月", "第20/21行累计税后", "1800.00 / 1800.00", "不同身份证互不累计"],
+]
+
 ERROR_TEST_ROWS = [
     [None, 6, "异常事业部", "北京", "报销人", "会计", "缺年份", "110101199001019001", 3000],
     [2026, None, "异常事业部", "北京", "报销人", "会计", "缺月份", "110101199001019002", 3000],
     [2026, 13, "异常事业部", "北京", "报销人", "会计", "月份13", "110101199001019003", 3000],
     [2026, 6, "异常事业部", "北京", "报销人", "会计", "缺身份证", None, 3000],
-    [2026, 6, "异常事业部", "北京", "报销人", "会计", "缺姓名", "110101199001019005", 3000],
+    [2026, 6, "异常事业部", "北京", "报销人", "会计", None, "110101199001019005", 3000],
     [2026, 6, "异常事业部", "北京", "报销人", "会计", "金额为空", "110101199001019006", None],
     [2026, 6, "异常事业部", "北京", "报销人", "会计", "金额为零", "110101199001019007", 0],
     [2026, 6, "异常事业部", "北京", "报销人", "会计", "金额为负", "110101199001019008", -100],
@@ -64,6 +78,7 @@ HEADER_FILL = PatternFill("solid", fgColor="D9EAF7")
 SUBHEADER_FILL = PatternFill("solid", fgColor="EAF4FB")
 CLEAR_HEADER_FILL = PatternFill("solid", fgColor="D9EAD3")
 ERROR_FILL = PatternFill("solid", fgColor="FCE4D6")
+PASS_FILL = PatternFill("solid", fgColor="D9EAD3")
 THIN = Side(style="thin", color="000000")
 MEDIUM = Side(style="medium", color="000000")
 BORDER_THIN = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
@@ -99,7 +114,16 @@ def _money(value: Decimal) -> Decimal:
     return money2_decimal(value)
 
 
-def _build_input_workbook(title: str, rows: list[list[object]], note: str | None = None) -> bytes:
+def _money_text(value: Decimal) -> str:
+    return money2(value)
+
+
+def _build_input_workbook(
+    title: str,
+    rows: list[list[object]],
+    note: str | None = None,
+    expected_rows: list[list[str]] | None = None,
+) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = title
@@ -130,7 +154,26 @@ def _build_input_workbook(title: str, rows: list[list[object]], note: str | None
         note_ws["A1"].alignment = LEFT
         note_ws["A1"].font = Font(bold=True)
         note_ws.column_dimensions["A"].width = 100
+    if expected_rows:
+        _write_expected_result_sheet(wb.create_sheet("预期结果说明"), expected_rows)
     return _save_workbook(wb)
+
+
+def _write_expected_result_sheet(ws, rows: list[list[str]]) -> None:
+    headers = ["场景编号", "场景名称", "验证字段", "预期结果", "说明"]
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=len(headers)):
+        for cell in row:
+            cell.border = BORDER_THIN
+            cell.alignment = LEFT if cell.column == 5 else CENTER
+            if cell.row == 1:
+                cell.fill = HEADER_FILL
+                cell.font = Font(bold=True)
+    _set_widths(ws, {"A": 12, "B": 22, "C": 26, "D": 20, "E": 60})
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:E{ws.max_row}"
 
 
 def build_template_workbook() -> bytes:
@@ -146,6 +189,7 @@ def build_logic_test_workbook() -> bytes:
         "逻辑测试数据",
         LOGIC_TEST_ROWS,
         "逻辑测试模板：覆盖免税、跨800、3360内、21000内、49500内、超过49500、增值税500临界、跨月、跨年、同名不同身份证、不同人同月等正常计算场景。",
+        EXPECTED_RESULT_ROWS,
     )
 
 
@@ -169,7 +213,25 @@ def build_result_workbook(input_rows: list[LaborInputRow]) -> bytes:
     _write_clear_sheet(ws2, calculated_rows)
     ws3 = wb.create_sheet("公式版台账")
     _write_formula_sheet(ws3, calculated_rows)
+    if is_logic_test_input(input_rows):
+        ws4 = wb.create_sheet("测试核对报告")
+        _write_test_report_sheet(ws4, calculated_rows)
     return _save_workbook(wb)
+
+
+def is_logic_test_input(input_rows: list[LaborInputRow]) -> bool:
+    if len(input_rows) != len(LOGIC_TEST_ROWS):
+        return False
+    for row, expected in zip(input_rows, LOGIC_TEST_ROWS):
+        if (
+            row.year != expected[0]
+            or row.month != expected[1]
+            or row.name != expected[6]
+            or row.id_no != expected[7]
+            or row.after_tax_amount != Decimal(str(expected[8]))
+        ):
+            return False
+    return True
 
 
 def _write_original_style_sheet(ws, rows: Iterable[LaborCalculatedRow]) -> None:
@@ -436,3 +498,48 @@ def _write_clear_sheet(ws, rows: Iterable[LaborCalculatedRow]) -> None:
     ws.row_dimensions[2].height = 36
     ws.freeze_panes = "A3"
     ws.auto_filter.ref = f"A2:W{max(row_idx - 1, 3)}"
+
+
+def _report_row(check_id: str, name: str, actual: str, expected: str, passed: bool, note: str) -> list[str]:
+    return [check_id, name, actual, expected, "通过" if passed else "失败", note]
+
+
+def _write_test_report_sheet(ws, rows: list[LaborCalculatedRow]) -> None:
+    headers = ["场景编号", "检查项", "实际值", "预期值", "是否通过", "说明"]
+    ws.append(headers)
+    by_index = {row.index: row for row in rows}
+
+    checks: list[list[str]] = []
+    checks.append(_report_row("T01", "累计税后≤800", _money_text(by_index[2].cumulative_after_tax_amount), "700.00", _money_text(by_index[2].cumulative_after_tax_amount) == "700.00" and _money_text(by_index[2].individual_tax_amount) == "0.00", "第2行累计税后700，个税0"))
+    checks.append(_report_row("T02", "同人同月跨过800", f"{_money_text(by_index[4].cumulative_after_tax_amount)} / {_money_text(by_index[4].individual_tax_amount)}", "900.00 / 25.00", _money_text(by_index[4].cumulative_after_tax_amount) == "900.00" and _money_text(by_index[4].individual_tax_amount) == "25.00", "第4行累计进入个税区间"))
+    checks.append(_report_row("T03", "3360内档位", _money_text(by_index[5].cumulative_pre_tax_without_vat), "3550.00", _money_text(by_index[5].cumulative_pre_tax_without_vat) == "3550.00", "税前=(3000-160)/0.8"))
+    checks.append(_report_row("T04", "21000内档位", _money_text(by_index[7].cumulative_pre_tax_without_vat), "17857.14", _money_text(by_index[7].cumulative_pre_tax_without_vat) == "17857.14", "累计税后15000，税前=15000/0.84"))
+    checks.append(_report_row("T05", "49500内档位", _money_text(by_index[9].cumulative_pre_tax_without_vat), "39473.68", _money_text(by_index[9].cumulative_pre_tax_without_vat) == "39473.68", "累计税后32000，税前=(32000-2000)/0.76"))
+    checks.append(_report_row("T06", "超过49500档位", _money_text(by_index[11].cumulative_pre_tax_without_vat), "77941.18", _money_text(by_index[11].cumulative_pre_tax_without_vat) == "77941.18", "累计税后60000，税前=(60000-7000)/0.68"))
+    checks.append(_report_row("T07", "增值税500临界", _money_text(by_index[12].vat_amount), "0.00", _money_text(by_index[12].vat_amount) == "0.00", "本次对应税前金额≤500"))
+    checks.append(_report_row("T08", "增值税超过500", _money_text(by_index[13].vat_amount), ">0", by_index[13].vat_amount > Decimal("0"), "本次对应税前金额>500"))
+    checks.append(_report_row("T09", "跨月重置累计", _money_text(by_index[15].cumulative_after_tax_amount), "3000.00", _money_text(by_index[15].cumulative_after_tax_amount) == "3000.00", "同身份证7月重新累计"))
+    checks.append(_report_row("T10", "跨年同月重置累计", _money_text(by_index[17].cumulative_after_tax_amount), "3000.00", _money_text(by_index[17].cumulative_after_tax_amount) == "3000.00", "同身份证2027年6月重新累计"))
+    same_name_actual = f"{_money_text(by_index[18].cumulative_after_tax_amount)} / {_money_text(by_index[19].cumulative_after_tax_amount)}"
+    checks.append(_report_row("T11", "同名不同身份证", same_name_actual, "3000.00 / 3000.00", same_name_actual == "3000.00 / 3000.00", "同名张三按身份证分别累计"))
+    different_people_actual = f"{_money_text(by_index[20].cumulative_after_tax_amount)} / {_money_text(by_index[21].cumulative_after_tax_amount)}"
+    checks.append(_report_row("T12", "不同人同月", different_people_actual, "1800.00 / 1800.00", different_people_actual == "1800.00 / 1800.00", "不同身份证互不累计"))
+
+    total_passed = all(row[4] == "通过" for row in checks)
+    ws.append(["汇总", "全部检查", "通过" if total_passed else "存在失败", "全部通过", "通过" if total_passed else "失败", "如有失败，请查看对应场景和原表数据"])
+    for check in checks:
+        ws.append(check)
+
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=len(headers)):
+        for cell in row:
+            cell.border = BORDER_THIN
+            cell.alignment = LEFT if cell.column == 6 else CENTER
+            if cell.row == 1:
+                cell.fill = HEADER_FILL
+                cell.font = Font(bold=True)
+            elif cell.column == 5:
+                cell.fill = PASS_FILL if cell.value == "通过" else ERROR_FILL
+                cell.font = Font(bold=True)
+    _set_widths(ws, {"A": 12, "B": 24, "C": 24, "D": 24, "E": 12, "F": 54})
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:F{ws.max_row}"
