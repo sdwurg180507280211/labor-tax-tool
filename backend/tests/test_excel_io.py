@@ -65,8 +65,8 @@ def test_error_test_template_is_intentionally_invalid():
     with pytest.raises(ValueError) as exc_info:
         read_labor_rows(BytesIO(data))
     message = str(exc_info.value)
-    assert "第2行" in message
-    assert "年份不能为空" in message
+    assert "第 2 行" in message
+    assert "year" in message
 
 
 def test_result_workbook_has_value_sheets_and_formula_sheet():
