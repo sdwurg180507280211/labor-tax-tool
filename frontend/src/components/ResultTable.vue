@@ -17,6 +17,13 @@
           <th>应开票金额</th>
           <th>应付款金额</th>
           <th>核对</th>
+          <th v-if="debugMode">累计维度</th>
+          <th v-if="debugMode">税后反推档位</th>
+          <th v-if="debugMode">个税档位</th>
+          <th v-if="debugMode">本次对应税前</th>
+          <th v-if="debugMode">增值税规则</th>
+          <th v-if="debugMode">跨档提示</th>
+          <th v-if="debugMode">核对通过</th>
         </tr>
       </thead>
       <tbody>
@@ -35,6 +42,13 @@
           <td class="money">{{ row.invoice_amount }}</td>
           <td class="money">{{ row.payment_amount }}</td>
           <td class="money">{{ row.check_amount }}</td>
+          <td v-if="debugMode">{{ row.debug_info?.cumulative_key }}</td>
+          <td v-if="debugMode" class="debug-cell">{{ row.debug_info?.pre_tax_bracket }}</td>
+          <td v-if="debugMode" class="debug-cell">{{ row.debug_info?.individual_tax_bracket }}</td>
+          <td v-if="debugMode" class="money">{{ row.debug_info?.allocated_pre_tax_amount }}</td>
+          <td v-if="debugMode" class="debug-cell">{{ row.debug_info?.vat_rule }}</td>
+          <td v-if="debugMode">{{ row.debug_info?.threshold_note }}</td>
+          <td v-if="debugMode">{{ row.debug_info?.check_ok }}</td>
         </tr>
       </tbody>
     </table>
@@ -42,5 +56,8 @@
 </template>
 
 <script setup>
-defineProps({ rows: { type: Array, default: () => [] } })
+defineProps({
+  rows: { type: Array, default: () => [] },
+  debugMode: { type: Boolean, default: false }
+})
 </script>
