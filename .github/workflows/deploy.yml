@@ -1,0 +1,25 @@
+name: Deploy to Aliyun ECS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy with Docker Compose
+        run: |
+          set -euo pipefail
+          docker compose --env-file /opt/labor-tax-tool/.env down || true
+          docker compose --env-file /opt/labor-tax-tool/.env up -d --build
+          docker image prune -f
+
+      - name: Health check
+        run: |
+          sleep 3
+          curl -fsS http://127.0.0.1:8090/api/health || exit 1

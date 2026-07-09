@@ -1,0 +1,21 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: labor-tax-tool-backend:latest
+    container_name: labor-tax-tool-backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+
+  labor-tax-tool:
+    build:
+      context: ./frontend
+    image: labor-tax-tool:latest
+    container_name: labor-tax-tool
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      # 宿主机:容器；容器内部固定 8081，由 nginx 反代 /api 到 backend:8000
+      - "${BIND_ADDR:-8090:8081}"
