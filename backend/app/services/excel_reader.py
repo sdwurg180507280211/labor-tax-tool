@@ -22,6 +22,7 @@ HEADER_ALIASES: dict[str, str] = {
     "身份证": "id_no",
     "讲者id": "id_no",
     "讲者编号": "id_no",
+    "税后劳务金额": "after_tax_amount",
     "税后劳务金额单次": "after_tax_amount",
     "税后劳务金额-单次": "after_tax_amount",
     "税后劳务金额（单次）": "after_tax_amount",
@@ -37,8 +38,8 @@ FIELD_LABELS = {
     "month": "月份",
     "day": "日期",
     "name": "姓名",
-    "id_no": "讲者ID/唯一标识",
-    "after_tax_amount": "税后劳务金额-单次",
+    "id_no": "身份证号码/讲者ID",
+    "after_tax_amount": "税后劳务金额",
 }
 
 
@@ -55,7 +56,7 @@ def normalize_header(value: Any) -> str:
 
 
 def find_header_row(ws) -> tuple[int, dict[int, str]]:
-    """Find the simplified 0709 ledger header row."""
+    """Find the customer simplified ledger header row without requiring a changed template."""
     for row_idx in range(1, min(ws.max_row, 20) + 1):
         mapping: dict[int, str] = {}
         for cell in ws[row_idx]:
@@ -64,7 +65,7 @@ def find_header_row(ws) -> tuple[int, dict[int, str]]:
                 mapping[cell.column] = HEADER_ALIASES[normalized]
         if len(set(mapping.values())) >= 4:
             return row_idx, mapping
-    raise ValueError("未识别到新版简版表头。请确保包含：年份、月份、日期、姓名、讲者ID/唯一标识、税后劳务金额-单次。")
+    raise ValueError("未识别到客户简版台账表头。请确保包含：年份、月份、日期、姓名、身份证号码/讲者ID、税后劳务金额。")
 
 
 def _format_validation_error(err: dict[str, Any]) -> str:
@@ -87,15 +88,15 @@ def _format_validation_error(err: dict[str, Any]) -> str:
     if field == "name":
         return "姓名不能为空"
     if field == "id_no":
-        return "讲者ID/唯一标识不能为空"
+        return "身份证号码/讲者ID不能为空"
     if field == "after_tax_amount":
         if "不能为空" in message:
-            return "税后劳务金额-单次不能为空"
+            return "税后劳务金额不能为空"
         if "必须是数字" in message:
-            return "税后劳务金额-单次必须是数字"
+            return "税后劳务金额必须是数字"
         if "greater than" in message:
-            return "税后劳务金额-单次必须大于0"
-        return "税后劳务金额-单次格式不正确"
+            return "税后劳务金额必须大于0"
+        return "税后劳务金额格式不正确"
     return f"{FIELD_LABELS.get(field, field)}：{message}"
 
 
