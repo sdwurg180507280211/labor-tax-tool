@@ -9,11 +9,11 @@ from fastapi.responses import StreamingResponse
 
 from app.schemas.labor import LaborInputRow, ManualCalculateRequest
 from app.services.excel_reader import read_labor_rows
-from app.services.excel_writer import build_template_workbook
 from app.services.test_workbooks import (
     build_error_test_workbook,
     build_logic_test_workbook,
     build_result_workbook,
+    build_template_workbook,
 )
 from app.services.tax_calculator import calculate_rows, money2
 
@@ -57,7 +57,7 @@ def health() -> dict[str, str]:
 
 @router.get("/template")
 def download_template() -> StreamingResponse:
-    return _download_workbook(build_template_workbook(), "labor_fee_input_template.xlsx")
+    return _download_workbook(build_template_workbook(), "labor_fee_backend_import_template.xlsx")
 
 
 @router.get("/test-template/logic")
