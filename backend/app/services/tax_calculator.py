@@ -31,10 +31,7 @@ def money2_decimal(value: Decimal) -> Decimal:
 
 
 def reverse_pre_tax_from_after_tax(cumulative_after_tax: Decimal) -> Decimal:
-    """Reverse cumulative pre-tax labor amount from cumulative after-tax amount.
-
-    The brackets follow the confirmed original workbook logic.
-    """
+    """Reverse monthly cumulative pre-tax amount from monthly cumulative after-tax amount."""
     if cumulative_after_tax <= Decimal("800"):
         return cumulative_after_tax
     if cumulative_after_tax <= Decimal("3360"):
@@ -62,72 +59,67 @@ def cumulative_individual_income_tax(cumulative_pre_tax: Decimal) -> Decimal:
 
 
 @dataclass
-class RunningState:
+class MonthlyState:
     cumulative_after_tax: Decimal = D0
-    cumulative_vat: Decimal = D0
-    cumulative_surcharge: Decimal = D0
     cumulative_iit: Decimal = D0
-    cumulative_invoice: Decimal = D0
-    cumulative_payment: Decimal = D0
+
+
+@dataclass
+class DailyState:
+    cumulative_after_tax: Decimal = D0
+    cumulative_iit: Decimal = D0
+    cumulative_contract: Decimal = D0
 
 
 def calculate_rows(rows: list[LaborInputRow]) -> list[LaborCalculatedRow]:
-    """Calculate all ledger rows in input order.
+    """Calculate simplified 0709 ledger rows in input order.
 
-    Cumulative key: year + month + id_no. The original sheet uses month + id_no;
-    year is intentionally included to avoid cross-year same-month mixing.
+    IIT is calculated by year + month + speaker ID.
+    VAT and contract amount are calculated by year + month + day + speaker ID.
     """
-    states: dict[tuple[int, int, str], RunningState] = defaultdict(RunningState)
+    monthly_states: dict[tuple[int, int, str], MonthlyState] = defaultdict(MonthlyState)
+    daily_states: dict[tuple[int, int, int, str], DailyState] = defaultdict(DailyState)
     result: list[LaborCalculatedRow] = []
 
     for index, row in enumerate(rows, start=1):
-        key = (row.year, row.month, row.id_no)
-        state = states[key]
+        monthly_key = (row.year, row.month, row.id_no)
+        daily_key = (row.year, row.month, row.day, row.id_no)
+        monthly = monthly_states[monthly_key]
+        daily = daily_states[daily_key]
 
         after_tax = row.after_tax_amount
-        state.cumulative_after_tax += after_tax
-        cumulative_pre_tax = reverse_pre_tax_from_after_tax(state.cumulative_after_tax)
 
-        allocated_pre_tax = (after_tax / state.cumulative_after_tax * cumulative_pre_tax) if state.cumulative_after_tax else D0
-        vat = D0 if allocated_pre_tax <= Decimal("500") else allocated_pre_tax * D_01
-        surcharge = vat * D_06
-
-        state.cumulative_vat += vat
-        state.cumulative_surcharge += surcharge
-
-        cumulative_pre_tax_with_vat_surcharge = cumulative_pre_tax + state.cumulative_vat + state.cumulative_surcharge
-        invoice = cumulative_pre_tax_with_vat_surcharge - state.cumulative_invoice
-        if invoice < D0:
-            invoice = D0
-        state.cumulative_invoice += invoice
-
+        monthly.cumulative_after_tax += after_tax
+        cumulative_pre_tax = reverse_pre_tax_from_after_tax(monthly.cumulative_after_tax)
         current_cumulative_iit = cumulative_individual_income_tax(cumulative_pre_tax)
-        iit = current_cumulative_iit - state.cumulative_iit
+        iit = current_cumulative_iit - monthly.cumulative_iit
         if iit < D0:
             iit = D0
-        state.cumulative_iit += iit
+        monthly.cumulative_iit += iit
 
-        payment = invoice - iit
-        state.cumulative_payment += payment
-        check = after_tax + vat + surcharge - payment
+        daily.cumulative_after_tax += after_tax
+        daily.cumulative_iit += iit
+        daily_cumulative_pre_tax = daily.cumulative_after_tax + daily.cumulative_iit
+        vat = D0 if daily_cumulative_pre_tax <= Decimal("1000") else daily_cumulative_pre_tax * D_01
+        surcharge = vat * D_06
+        daily_cumulative_contract = daily_cumulative_pre_tax + vat + surcharge
+        contract = daily_cumulative_contract - daily.cumulative_contract
+        if contract < D0:
+            contract = D0
+        daily.cumulative_contract += contract
 
         result.append(
             LaborCalculatedRow(
                 **row.model_dump(),
                 index=index,
-                cumulative_after_tax_amount=state.cumulative_after_tax,
+                cumulative_after_tax_amount=monthly.cumulative_after_tax,
                 cumulative_pre_tax_without_vat=cumulative_pre_tax,
-                cumulative_pre_tax_with_vat_surcharge=cumulative_pre_tax_with_vat_surcharge,
-                invoice_amount=invoice,
-                payment_amount=payment,
-                cumulative_payment_amount=state.cumulative_payment,
+                daily_cumulative_pre_tax_without_vat=daily_cumulative_pre_tax,
+                contract_amount=contract,
                 vat_amount=vat,
                 surcharge_amount=surcharge,
                 individual_tax_amount=iit,
-                cumulative_vat_amount=state.cumulative_vat,
-                cumulative_surcharge_amount=state.cumulative_surcharge,
-                cumulative_individual_tax_amount=state.cumulative_iit,
-                check_amount=check,
+                cumulative_individual_tax_amount=monthly.cumulative_iit,
             )
         )
 
