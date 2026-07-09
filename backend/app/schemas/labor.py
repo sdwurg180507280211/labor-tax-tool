@@ -13,11 +13,11 @@ class LaborInputRow(BaseModel):
     month: int = Field(..., ge=1, le=12, description="月份")
     department: Optional[str] = Field(default="", description="事业部")
     province: Optional[str] = Field(default="", description="省区")
-    reimburser: Optional[str] = Field(default="", description="报销人")
+    reimburser: Optional[str] = Field(default="", description="发起人/报销人")
     accountant: Optional[str] = Field(default="", description="会计")
-    name: str = Field(..., min_length=1, description="姓名")
-    id_no: str = Field(..., min_length=1, description="身份证号码")
-    after_tax_amount: Decimal = Field(..., gt=Decimal("0"), description="税后劳务金额")
+    name: str = Field(..., min_length=1, description="讲者姓名")
+    id_no: str = Field(..., min_length=1, description="讲者ID")
+    after_tax_amount: Decimal = Field(..., gt=Decimal("0"), description="劳务费（实付金额）")
 
     @field_validator("department", "province", "reimburser", "accountant", mode="before")
     @classmethod
@@ -37,11 +37,11 @@ class LaborInputRow(BaseModel):
     @classmethod
     def parse_decimal(cls, value: Any) -> Decimal:
         if value is None or value == "":
-            raise ValueError("税后劳务金额不能为空")
+            raise ValueError("劳务费（实付金额）不能为空")
         try:
             return Decimal(str(value).replace(",", "").strip())
         except (InvalidOperation, AttributeError) as exc:
-            raise ValueError("税后劳务金额必须是数字") from exc
+            raise ValueError("劳务费（实付金额）必须是数字") from exc
 
 
 class LaborCalculatedRow(LaborInputRow):
