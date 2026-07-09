@@ -24,13 +24,7 @@
     </section>
 
     <section class="card">
-      <div class="tabs">
-        <button :class="['tab', activeTab === 'upload' && 'active']" @click="activeTab = 'upload'">上传 Excel</button>
-        <button :class="['tab', activeTab === 'manual' && 'active']" @click="activeTab = 'manual'">手动录入 / 粘贴</button>
-      </div>
-
-      <UploadPanel v-if="activeTab === 'upload'" :loading="loading" @calculate="handleUploadCalculate" />
-      <ManualTable v-else :loading="loading" @calculate="handleManualCalculate" />
+      <UploadPanel :loading="loading" @calculate="handleUploadCalculate" />
     </section>
 
     <section v-if="error" class="alert error">{{ error }}</section>
@@ -64,10 +58,8 @@
 <script setup>
 import { ref } from 'vue'
 import UploadPanel from '../components/UploadPanel.vue'
-import ManualTable from '../components/ManualTable.vue'
 import ResultTable from '../components/ResultTable.vue'
 import {
-  calculateManual,
   calculateUpload,
   downloadErrorTestTemplate,
   downloadLogicTestTemplate,
@@ -75,7 +67,6 @@ import {
   exportLedger
 } from '../api/laborTaxApi'
 
-const activeTab = ref('upload')
 const loading = ref(false)
 const error = ref('')
 const resultRows = ref([])
@@ -108,13 +99,6 @@ function handleDownloadErrorTestTemplate() { runTask(async () => downloadErrorTe
 function handleUploadCalculate(file) {
   runTask(async () => {
     const payload = await calculateUpload(file)
-    applyResult(payload)
-  })
-}
-
-function handleManualCalculate(rows) {
-  runTask(async () => {
-    const payload = await calculateManual(rows)
     applyResult(payload)
   })
 }
