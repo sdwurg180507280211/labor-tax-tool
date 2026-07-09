@@ -25,6 +25,10 @@ def make_row(amount=3000, name="张三", id_no="SPK000001", year=2026, month=6, 
     )
 
 
+def money_cell(cell) -> str:
+    return f"{float(cell.value):.2f}"
+
+
 def test_simple_template_can_be_read_by_reader():
     data = build_template_workbook()
     wb = load_workbook(BytesIO(data), data_only=True)
@@ -111,14 +115,14 @@ def test_result_workbook_has_simplified_ledger_and_rule_sheet():
     assert ws["N5"].value == "个税"
 
     assert ws["A6"].value == 1
-    assert ws["G6"].value == Decimal("1000.00")
-    assert ws["H7"].value == Decimal("2000.00")
-    assert ws["I7"].value == Decimal("2300.00")
-    assert ws["J7"].value == Decimal("2300.00")
-    assert ws["K7"].value == Decimal("1263.25")
-    assert ws["L7"].value == Decimal("23.00")
-    assert ws["M7"].value == Decimal("1.38")
-    assert ws["N7"].value == Decimal("250.00")
+    assert money_cell(ws["G6"]) == "1000.00"
+    assert money_cell(ws["H7"]) == "2000.00"
+    assert money_cell(ws["I7"]) == "2300.00"
+    assert money_cell(ws["J7"]) == "2300.00"
+    assert money_cell(ws["K7"]) == "1263.25"
+    assert money_cell(ws["L7"]) == "23.00"
+    assert money_cell(ws["M7"]) == "1.38"
+    assert money_cell(ws["N7"]) == "250.00"
 
     rule_ws = wb["规则说明"]
     assert rule_ws["A1"].value == "规则项"
@@ -135,8 +139,6 @@ def test_logic_template_export_uses_simplified_daily_vat_rule():
     assert "单日累计税前金额\n-含个税不含增值税" in headers
     assert "单次税前金额\n-含个税、增值税" in headers
 
-    # SPK007: one row at exactly 1000 after tax; single-day pre-tax is 1050 because IIT is 50,
-    # so VAT should be calculated. This confirms the rule uses daily pre-tax, not raw after-tax.
     for row_idx in range(6, ws.max_row + 1):
         if ws.cell(row_idx, 6).value == "SPK008":
             assert ws.cell(row_idx, 12).value > 0
