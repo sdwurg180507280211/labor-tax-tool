@@ -6,22 +6,22 @@ import pytest
 
 from app.schemas.labor import LaborInputRow
 from app.services.excel_reader import read_labor_rows
-from app.services.excel_writer import build_template_workbook
 from app.services.test_workbooks import (
     build_error_test_workbook,
     build_logic_test_workbook,
     build_result_workbook,
+    build_template_workbook,
 )
 
 
-def make_row(amount=3000, name="张三", id_no="110101199001011234", year=2026, month=6):
+def make_row(amount=3000, name="张三", id_no="SPK000001", year=2026, month=6):
     return LaborInputRow(
         year=year,
         month=month,
         department="事业部A",
-        province="北京",
+        province="",
         reimburser="报销人",
-        accountant="会计",
+        accountant="",
         name=name,
         id_no=id_no,
         after_tax_amount=Decimal(str(amount)),
@@ -32,13 +32,21 @@ def has_no_fill(cell) -> bool:
     return cell.fill.fill_type is None
 
 
-def test_template_can_be_read_by_reader():
+def test_backend_template_can_be_read_by_reader():
     data = build_template_workbook()
+    wb = load_workbook(BytesIO(data), data_only=True)
+    ws = wb["后台导出模板"]
+    assert ws["I1"].value == "会议日期"
+    assert ws["P1"].value == "讲者姓名"
+    assert ws["Q1"].value == "讲者ID"
+    assert ws["V1"].value == "劳务费（实付金额）"
+
     rows = read_labor_rows(BytesIO(data))
     assert len(rows) == 1
     assert rows[0].year == 2026
     assert rows[0].month == 6
     assert rows[0].name == "张三"
+    assert rows[0].id_no == "SPK000001"
     assert rows[0].after_tax_amount == Decimal("3000")
 
 
@@ -76,16 +84,15 @@ def test_error_test_template_reports_all_invalid_rows_with_readable_messages():
     with pytest.raises(ValueError) as exc_info:
         read_labor_rows(BytesIO(data))
     message = str(exc_info.value)
-    for row_number in range(2, 11):
+    for row_number in range(2, 10):
         assert f"第 {row_number} 行" in message
-    assert "年份" in message and "不能为空" in message
-    assert "月份" in message and "不能为空" in message
-    assert "月份必须" in message and "1-12" in message
-    assert "身份证号码不能为空" in message
-    assert "姓名不能为空" in message
-    assert "税后劳务金额不能为空" in message
-    assert "税后劳务金额必须大于" in message
-    assert "税后劳务金额必须是数字" in message
+    assert "会议日期不能为空" in message
+    assert "会议日期月份必须在1-12之间" in message
+    assert "讲者姓名不能为空" in message
+    assert "讲者ID不能为空" in message
+    assert "劳务费（实付金额）不能为空" in message
+    assert "劳务费（实付金额）必须大于0" in message
+    assert "劳务费（实付金额）必须是数字" in message
 
 
 def test_result_workbook_has_value_sheets_formula_sheet_and_test_report():
@@ -99,6 +106,8 @@ def test_result_workbook_has_value_sheets_formula_sheet_and_test_report():
     assert has_no_fill(ws1["A1"])
     assert has_no_fill(ws1["J1"])
     assert ws1["A2"].value == "劳务费税前（后）相关税费换算台账"
+    assert ws1["H4"].value == "讲者姓名"
+    assert ws1["I4"].value == "讲者ID"
     assert ws1["J4"].value == "税后劳务金额"
     assert ws1["X4"].value == "核对"
     assert ws1["A6"].value == 1
@@ -110,6 +119,8 @@ def test_result_workbook_has_value_sheets_formula_sheet_and_test_report():
 
     ws2 = wb["清晰版台账"]
     assert ws2["A1"].value == "基础信息"
+    assert ws2["H2"].value == "讲者姓名"
+    assert ws2["I2"].value == "讲者ID"
     assert ws2["W2"].value == "核对结果"
 
     ws3 = wb["公式版台账"]
@@ -118,6 +129,8 @@ def test_result_workbook_has_value_sheets_formula_sheet_and_test_report():
     assert has_no_fill(ws3["A1"])
     assert has_no_fill(ws3["J1"])
     assert ws3["A2"].value == "劳务费税前（后）相关税费换算台账"
+    assert ws3["H4"].value == "讲者姓名"
+    assert ws3["I4"].value == "讲者ID"
     assert ws3["A6"].value == 1
     assert ws3["J6"].value == Decimal("400.00")
     assert has_no_fill(ws3["A6"])
