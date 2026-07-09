@@ -3,8 +3,8 @@
     <div class="dropzone" @dragover.prevent @drop.prevent="onDrop">
       <input ref="fileInput" type="file" accept=".xlsx,.xlsm" hidden @change="onFileChange" />
       <div class="dropzone-icon">📄</div>
-      <h3>上传新版简版0709劳务明细 Excel</h3>
-      <p>支持 .xlsx / .xlsm。请包含：年份、月份、日期、姓名、讲者ID、税后劳务金额-单次。</p>
+      <h3>上传后台导出表格 Excel</h3>
+      <p>支持 .xlsx / .xlsm。请上传后台原始导出表，需包含：会议日期、讲者姓名、讲者ID、劳务费（实付金额）。</p>
       <button class="secondary" type="button" @click="fileInput.click()">选择文件</button>
       <p v-if="selectedFile" class="file-name">已选择：{{ selectedFile.name }}</p>
     </div>
