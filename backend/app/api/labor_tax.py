@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from io import BytesIO
 from decimal import Decimal
+from io import BytesIO
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -32,8 +32,9 @@ def _rows_response(input_rows: list[LaborInputRow]) -> dict[str, Any]:
     calculated = calculate_rows(input_rows)
     zero = Decimal("0")
     total_after_tax = sum((row.after_tax_amount for row in input_rows), start=zero)
-    total_invoice = sum((row.invoice_amount for row in calculated), start=zero)
-    total_payment = sum((row.payment_amount for row in calculated), start=zero)
+    total_contract = sum((row.contract_amount for row in calculated), start=zero)
+    total_vat = sum((row.vat_amount for row in calculated), start=zero)
+    total_surcharge = sum((row.surcharge_amount for row in calculated), start=zero)
     total_iit = sum((row.individual_tax_amount for row in calculated), start=zero)
     return {
         "success": True,
@@ -43,8 +44,9 @@ def _rows_response(input_rows: list[LaborInputRow]) -> dict[str, Any]:
         "summary": {
             "row_count": len(calculated),
             "total_after_tax_amount": money2(total_after_tax) if calculated else "0.00",
-            "total_invoice_amount": money2(total_invoice) if calculated else "0.00",
-            "total_payment_amount": money2(total_payment) if calculated else "0.00",
+            "total_contract_amount": money2(total_contract) if calculated else "0.00",
+            "total_vat_amount": money2(total_vat) if calculated else "0.00",
+            "total_surcharge_amount": money2(total_surcharge) if calculated else "0.00",
             "total_individual_tax_amount": money2(total_iit) if calculated else "0.00",
         },
     }
@@ -57,17 +59,17 @@ def health() -> dict[str, str]:
 
 @router.get("/template")
 def download_template() -> StreamingResponse:
-    return _download_workbook(build_template_workbook(), "labor_fee_backend_import_template.xlsx")
+    return _download_workbook(build_template_workbook(), "labor_fee_simple_0709_import_template.xlsx")
 
 
 @router.get("/test-template/logic")
 def download_logic_test_template() -> StreamingResponse:
-    return _download_workbook(build_logic_test_workbook(), "labor_fee_logic_test_template.xlsx")
+    return _download_workbook(build_logic_test_workbook(), "labor_fee_simple_0709_logic_test_template.xlsx")
 
 
 @router.get("/test-template/error")
 def download_error_test_template() -> StreamingResponse:
-    return _download_workbook(build_error_test_workbook(), "labor_fee_error_test_template.xlsx")
+    return _download_workbook(build_error_test_workbook(), "labor_fee_simple_0709_error_test_template.xlsx")
 
 
 @router.post("/calculate/upload")
@@ -93,4 +95,4 @@ def calculate_manual(payload: ManualCalculateRequest) -> dict[str, Any]:
 def export_result(payload: ManualCalculateRequest) -> StreamingResponse:
     if not payload.rows:
         raise HTTPException(status_code=400, detail="没有可导出的数据。")
-    return _download_workbook(build_result_workbook(payload.rows), "labor_fee_tax_ledger.xlsx")
+    return _download_workbook(build_result_workbook(payload.rows), "labor_fee_simple_0709_ledger.xlsx")
