@@ -28,6 +28,10 @@ def make_row(amount=3000, name="张三", id_no="110101199001011234", year=2026, 
     )
 
 
+def has_no_fill(cell) -> bool:
+    return cell.fill.fill_type is None
+
+
 def test_template_can_be_read_by_reader():
     data = build_template_workbook()
     rows = read_labor_rows(BytesIO(data))
@@ -90,11 +94,17 @@ def test_result_workbook_has_value_sheets_formula_sheet_and_test_report():
     assert wb.sheetnames == ["劳务费税费换算台账", "清晰版台账", "公式版台账", "测试核对报告"]
 
     ws1 = wb["劳务费税费换算台账"]
+    assert ws1["A1"].value is None
+    assert ws1["J1"].value is None
+    assert has_no_fill(ws1["A1"])
+    assert has_no_fill(ws1["J1"])
     assert ws1["A2"].value == "劳务费税前（后）相关税费换算台账"
     assert ws1["J4"].value == "税后劳务金额"
     assert ws1["X4"].value == "核对"
     assert ws1["A6"].value == 1
     assert ws1["J6"].value == Decimal("400.00")
+    assert has_no_fill(ws1["A6"])
+    assert has_no_fill(ws1["J6"])
     assert ws1["K7"].value == Decimal("900.00")
     assert not isinstance(ws1["L7"].value, str) or not ws1["L7"].value.startswith("=")
 
@@ -103,9 +113,15 @@ def test_result_workbook_has_value_sheets_formula_sheet_and_test_report():
     assert ws2["W2"].value == "核对结果"
 
     ws3 = wb["公式版台账"]
+    assert ws3["A1"].value is None
+    assert ws3["J1"].value is None
+    assert has_no_fill(ws3["A1"])
+    assert has_no_fill(ws3["J1"])
     assert ws3["A2"].value == "劳务费税前（后）相关税费换算台账"
     assert ws3["A6"].value == 1
     assert ws3["J6"].value == Decimal("400.00")
+    assert has_no_fill(ws3["A6"])
+    assert has_no_fill(ws3["J6"])
     assert ws3["K7"].value.startswith("=SUMIFS(")
     assert ws3["L7"].value.startswith("=IF(")
     assert ws3["Q7"].value.startswith("=IFERROR(")
