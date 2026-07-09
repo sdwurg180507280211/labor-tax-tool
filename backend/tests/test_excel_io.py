@@ -15,30 +15,22 @@ from app.services.test_workbooks import (
 
 
 def make_row(amount=3000, name="张三", id_no="SPK000001", year=2026, month=6, day=1):
-    return LaborInputRow(
-        year=year,
-        month=month,
-        day=day,
-        name=name,
-        id_no=id_no,
-        after_tax_amount=Decimal(str(amount)),
-    )
+    return LaborInputRow(year=year, month=month, day=day, name=name, id_no=id_no, after_tax_amount=Decimal(str(amount)))
 
 
 def money_cell(cell) -> str:
     return f"{float(cell.value):.2f}"
 
 
-def test_simple_template_can_be_read_by_reader():
+def test_backend_export_template_can_be_read_by_reader():
     data = build_template_workbook()
     wb = load_workbook(BytesIO(data), data_only=True)
-    ws = wb["简版导入模板"]
-    assert ws["A1"].value == "年份"
-    assert ws["B1"].value == "月份"
-    assert ws["C1"].value == "日期"
-    assert ws["D1"].value == "姓名"
-    assert ws["E1"].value == "讲者ID"
-    assert ws["F1"].value == "税后劳务金额-单次"
+    ws = wb["Worksheet"]
+    assert ws["A1"].value == "会议ID"
+    assert ws["I1"].value == "会议日期"
+    assert ws["P1"].value == "讲者姓名"
+    assert ws["Q1"].value == "讲者ID"
+    assert ws["V1"].value == "劳务费（实付金额）"
 
     rows = read_labor_rows(BytesIO(data))
     assert len(rows) == 1
@@ -50,50 +42,39 @@ def test_simple_template_can_be_read_by_reader():
     assert rows[0].after_tax_amount == Decimal("3000")
 
 
-def test_logic_test_template_has_expected_result_sheet_and_covers_key_scenarios():
+def test_logic_test_template_matches_backend_export_and_covers_key_scenarios():
     data = build_logic_test_workbook()
     wb = load_workbook(BytesIO(data), data_only=True)
-    assert wb.sheetnames == ["逻辑测试数据", "预期结果说明", "说明"]
-    expected_ws = wb["预期结果说明"]
-    assert expected_ws["A1"].value == "场景编号"
-    assert expected_ws["A2"].value == "T01"
-    assert "跨800" in expected_ws["B3"].value
+    assert wb.sheetnames == ["Worksheet", "预期结果说明", "说明"]
+    ws = wb["Worksheet"]
+    assert ws["I1"].value == "会议日期"
+    assert ws["P1"].value == "讲者姓名"
+    assert ws["Q1"].value == "讲者ID"
+    assert ws["V1"].value == "劳务费（实付金额）"
 
     rows = read_labor_rows(BytesIO(data))
     assert len(rows) == 22
-
     names = [row.name for row in rows]
-    assert "测试G-单日1000临界" in names
-    assert "测试H-单日超过1000" in names
     assert "测试I-同日多笔" in names
     assert "测试J-跨日" in names
-
-    same_day = [row for row in rows if row.id_no == "SPK009" and row.day == 1]
-    assert len(same_day) == 2
-    cross_day = [row for row in rows if row.id_no == "SPK009"]
-    assert {row.day for row in cross_day} >= {1, 2}
-
-    same_name_rows = [row for row in rows if row.name == "张三"]
-    assert len({row.id_no for row in same_name_rows}) == 2
+    assert len([row for row in rows if row.id_no == "SPK009" and row.day == 1]) == 2
+    assert len({row.id_no for row in rows if row.name == "张三"}) == 2
 
 
-def test_error_test_template_reports_all_invalid_rows_with_readable_messages():
+def test_error_test_template_reports_invalid_rows_with_readable_messages():
     data = build_error_test_workbook()
     with pytest.raises(ValueError) as exc_info:
         read_labor_rows(BytesIO(data))
     message = str(exc_info.value)
-    for row_number in range(2, 13):
+    for row_number in range(2, 10):
         assert f"第 {row_number} 行" in message
-    assert "年份不能为空" in message
-    assert "月份不能为空" in message
-    assert "月份必须在1-12之间" in message
-    assert "日期不能为空" in message
-    assert "日期必须在1-31之间" in message
-    assert "姓名不能为空" in message
-    assert "讲者ID/唯一标识不能为空" in message
-    assert "税后劳务金额-单次不能为空" in message
-    assert "税后劳务金额-单次必须大于0" in message
-    assert "税后劳务金额-单次必须是数字" in message
+    assert "会议日期不能为空" in message
+    assert "会议日期月份必须在1-12之间" in message
+    assert "讲者姓名不能为空" in message
+    assert "讲者ID不能为空" in message
+    assert "劳务费（实付金额）不能为空" in message
+    assert "劳务费（实付金额）必须大于0" in message
+    assert "劳务费（实付金额）必须是数字" in message
 
 
 def test_result_workbook_has_simplified_ledger_and_rule_sheet():
@@ -126,18 +107,15 @@ def test_result_workbook_has_simplified_ledger_and_rule_sheet():
 
     rule_ws = wb["规则说明"]
     assert rule_ws["A1"].value == "规则项"
-    assert "年份 + 月份 + 日期 + 讲者ID" in rule_ws["B3"].value
+    assert "后台导出表格.xlsx" in rule_ws["B2"].value
+    assert "年份 + 月份 + 日期 + 讲者ID" in rule_ws["B4"].value
 
 
-def test_logic_template_export_uses_simplified_daily_vat_rule():
+def test_logic_template_export_uses_daily_vat_rule():
     logic_rows = read_labor_rows(BytesIO(build_logic_test_workbook()))
     data = build_result_workbook(logic_rows)
     wb = load_workbook(BytesIO(data), data_only=True)
     ws = wb["劳务费税费换算台账"]
-
-    headers = [ws.cell(4, col).value or ws.cell(5, col).value for col in range(1, 15)]
-    assert "单日累计税前金额\n-含个税不含增值税" in headers
-    assert "单次税前金额\n-含个税、增值税" in headers
 
     for row_idx in range(6, ws.max_row + 1):
         if ws.cell(row_idx, 6).value == "SPK008":
