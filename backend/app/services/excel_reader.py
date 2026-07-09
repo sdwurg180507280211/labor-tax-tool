@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any, BinaryIO
+import re
 
 from openpyxl import load_workbook
 from pydantic import ValidationError
@@ -8,47 +10,22 @@ from pydantic import ValidationError
 from app.schemas.labor import LaborInputRow
 
 HEADER_ALIASES: dict[str, str] = {
-    "年份": "year",
-    "年": "year",
-    "year": "year",
-    "月份": "month",
-    "月": "month",
-    "month": "month",
+    "会议日期": "event_date",
     "事业部": "department",
-    "部门": "department",
-    "department": "department",
-    "省区": "province",
-    "省份": "province",
-    "区域": "province",
-    "province": "province",
-    "报销人": "reimburser",
-    "reimburser": "reimburser",
-    "会计": "accountant",
-    "accountant": "accountant",
-    "姓名": "name",
-    "名称": "name",
-    "name": "name",
-    "身份证号码": "id_no",
-    "身份证号": "id_no",
-    "身份证": "id_no",
-    "id_no": "id_no",
-    "idno": "id_no",
-    "税后劳务金额": "after_tax_amount",
-    "税后劳务金额单次": "after_tax_amount",
-    "税后劳务金额-单次": "after_tax_amount",
-    "税后劳务金额（单次）": "after_tax_amount",
-    "单次税后劳务金额": "after_tax_amount",
-    "劳务费金额": "after_tax_amount",
-    "after_tax_amount": "after_tax_amount",
+    "发起人": "reimburser",
+    "讲者姓名": "name",
+    "讲者id": "id_no",
+    "劳务费（实付金额）": "after_tax_amount",
+    "劳务费(实付金额)": "after_tax_amount",
+    "劳务费实付金额": "after_tax_amount",
 }
 
-REQUIRED_FIELDS = {"year", "month", "name", "id_no", "after_tax_amount"}
+REQUIRED_FIELDS = {"event_date", "name", "id_no", "after_tax_amount"}
 FIELD_LABELS = {
-    "year": "年份",
-    "month": "月份",
-    "name": "姓名",
-    "id_no": "身份证号码",
-    "after_tax_amount": "税后劳务金额",
+    "event_date": "会议日期",
+    "name": "讲者姓名",
+    "id_no": "讲者ID",
+    "after_tax_amount": "劳务费（实付金额）",
 }
 
 
@@ -60,13 +37,12 @@ def normalize_header(value: Any) -> str:
         .replace("\n", "")
         .replace("\r", "")
         .replace("_", "")
-        .replace("-", "-")
         .lower()
     )
 
 
 def find_header_row(ws) -> tuple[int, dict[int, str]]:
-    """Find the first row that contains at least 3 known headers."""
+    """Find the first row that matches the latest backend export template."""
     for row_idx in range(1, min(ws.max_row, 20) + 1):
         mapping: dict[int, str] = {}
         for cell in ws[row_idx]:
@@ -75,7 +51,35 @@ def find_header_row(ws) -> tuple[int, dict[int, str]]:
                 mapping[cell.column] = HEADER_ALIASES[normalized]
         if len(set(mapping.values())) >= 3:
             return row_idx, mapping
-    raise ValueError("未识别到表头。请使用模板，或确保包含：年份、月份、姓名、身份证号码、税后劳务金额。")
+    raise ValueError("未识别到后台导出表头。请使用最新模板，需包含：会议日期、讲者姓名、讲者ID、劳务费（实付金额）。")
+
+
+def _parse_event_year_month(value: Any) -> tuple[int, int]:
+    if value in (None, ""):
+        raise ValueError("会议日期不能为空")
+    if isinstance(value, datetime):
+        return value.year, value.month
+    if isinstance(value, date):
+        return value.year, value.month
+
+    text = str(value).strip()
+    if not text:
+        raise ValueError("会议日期不能为空")
+
+    patterns = [
+        r"^(\d{4})[-/\.](\d{1,2})[-/\.](\d{1,2})$",
+        r"^(\d{4})年(\d{1,2})月(\d{1,2})日$",
+        r"^(\d{4})(\d{2})(\d{2})$",
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, text)
+        if match:
+            year = int(match.group(1))
+            month = int(match.group(2))
+            if not 1 <= month <= 12:
+                raise ValueError("会议日期月份必须在1-12之间")
+            return year, month
+    raise ValueError("会议日期格式不正确，请使用日期格式，如 2026-06-01")
 
 
 def _format_validation_error(err: dict[str, Any]) -> str:
@@ -85,30 +89,22 @@ def _format_validation_error(err: dict[str, Any]) -> str:
     error_type = str(err.get("type", ""))
 
     if field == "year":
-        if err.get("input") is None or "None" in message or error_type == "missing":
-            return "年份不能为空"
-        if "greater than or equal" in message or "less than or equal" in message:
-            return "年份必须在1900-2999之间"
-        return "年份必须是数字"
+        return "会议日期年份必须在1900-2999之间"
     if field == "month":
-        if err.get("input") is None or "None" in message or error_type == "missing":
-            return "月份不能为空"
-        if "greater than or equal" in message or "less than or equal" in message:
-            return "月份必须在1-12之间"
-        return "月份必须是数字"
+        return "会议日期月份必须在1-12之间"
     if field == "name":
-        return "姓名不能为空"
+        return "讲者姓名不能为空"
     if field == "id_no":
-        return "身份证号码不能为空"
+        return "讲者ID不能为空"
     if field == "after_tax_amount":
         if "不能为空" in message:
-            return "税后劳务金额不能为空"
+            return "劳务费（实付金额）不能为空"
         if "必须是数字" in message:
-            return "税后劳务金额必须是数字"
+            return "劳务费（实付金额）必须是数字"
         if "greater than" in message:
-            return "税后劳务金额必须大于0"
-        return "税后劳务金额格式不正确"
-    return f"{label}：{message}"
+            return "劳务费（实付金额）必须大于0"
+        return "劳务费（实付金额）格式不正确"
+    return f"{label}：{message or error_type}"
 
 
 def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
@@ -124,16 +120,25 @@ def read_labor_rows(file_obj: BinaryIO) -> list[LaborInputRow]:
     errors: list[str] = []
     for excel_row_idx in range(header_row + 1, ws.max_row + 1):
         raw: dict[str, Any] = {}
+        event_date_value: Any = None
         empty = True
         for col_idx, field in col_to_field.items():
             value = ws.cell(excel_row_idx, col_idx).value
             if value not in (None, ""):
                 empty = False
-            raw[field] = value
+            if field == "event_date":
+                event_date_value = value
+            else:
+                raw[field] = value
         if empty:
             continue
         try:
+            year, month = _parse_event_year_month(event_date_value)
+            raw["year"] = year
+            raw["month"] = month
             rows.append(LaborInputRow(**raw))
+        except ValueError as exc:
+            errors.append(f"第 {excel_row_idx} 行：{exc}")
         except ValidationError as exc:
             msg = "；".join(_format_validation_error(err) for err in exc.errors())
             errors.append(f"第 {excel_row_idx} 行：{msg}")
