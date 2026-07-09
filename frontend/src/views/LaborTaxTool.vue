@@ -3,7 +3,7 @@
     <section class="hero">
       <div>
         <p class="eyebrow">无登录 · 不入库 · 上传即算 · 导出即走</p>
-        <h1>劳务费税费换算工具</h1>
+        <h1>劳务费税费换算工具2</h1>
         <p class="desc">上传后台导出的劳务明细，系统按“年份 + 月份 + 讲者ID”累计，自动计算税前金额、个税、增值税、附加税、应开票金额和应付款金额。</p>
       </div>
       <div class="template-actions">
