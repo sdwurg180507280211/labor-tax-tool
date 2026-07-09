@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">无登录 · 不入库 · 上传即算 · 导出即走</p>
         <h1>劳务费税费换算工具</h1>
-        <p class="desc">上传新版简版0709劳务明细，系统按“年月+讲者ID”算个税，按“年月日+讲者ID”算增值税和协议签订金额。</p>
+        <p class="desc">上传后台导出表格.xlsx，系统自动读取会议日期、讲者姓名、讲者ID和劳务费（实付金额），再按新版0709规则生成客户台账。</p>
       </div>
       <div class="template-actions">
         <button class="secondary" @click="handleDownloadTemplate">下载导入模板</button>
