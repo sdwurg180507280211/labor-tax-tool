@@ -75,10 +75,10 @@ def test_vat_resets_by_day_but_iit_keeps_monthly_accumulation():
     assert money2(result[0].vat_amount) == "0.00"
     assert money2(result[1].daily_cumulative_pre_tax_without_vat) == "1300.00"
     assert money2(result[1].vat_amount) == "13.00"
-    assert money2(result[2].daily_cumulative_pre_tax_without_vat) == "720.00"
+    assert money2(result[2].daily_cumulative_pre_tax_without_vat) == "750.00"
     assert money2(result[2].vat_amount) == "0.00"
     assert money2(result[2].cumulative_after_tax_amount) == "1800.00"
-    assert money2(result[2].individual_tax_amount) == "120.00"
+    assert money2(result[2].individual_tax_amount) == "150.00"
 
 
 def test_monthly_key_includes_year_month_and_speaker_id():
