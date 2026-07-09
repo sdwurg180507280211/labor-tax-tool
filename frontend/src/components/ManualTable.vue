@@ -30,7 +30,7 @@
         </tbody>
       </table>
     </div>
-    <p class="hint">必填字段：年份、月份、姓名、身份证号码、税后劳务金额。</p>
+    <p class="hint">必填字段：年份、月份、讲者姓名、讲者ID、劳务费（实付金额）。</p>
   </div>
 </template>
 
@@ -45,11 +45,11 @@ const columns = [
   { key: 'month', label: '月份', type: 'number', required: true, placeholder: '6' },
   { key: 'department', label: '事业部' },
   { key: 'province', label: '省区' },
-  { key: 'reimburser', label: '报销人' },
+  { key: 'reimburser', label: '发起人/报销人' },
   { key: 'accountant', label: '会计' },
-  { key: 'name', label: '姓名', required: true },
-  { key: 'id_no', label: '身份证号码', required: true },
-  { key: 'after_tax_amount', label: '税后劳务金额', type: 'number', required: true, placeholder: '3000' }
+  { key: 'name', label: '讲者姓名', required: true },
+  { key: 'id_no', label: '讲者ID', required: true },
+  { key: 'after_tax_amount', label: '劳务费（实付金额）', type: 'number', required: true, placeholder: '3000' }
 ]
 
 let idSeed = 1
