@@ -59,17 +59,17 @@ def health() -> dict[str, str]:
 
 @router.get("/template")
 def download_template() -> StreamingResponse:
-    return _download_workbook(build_template_workbook(), "labor_fee_simple_0709_import_template.xlsx")
+    return _download_workbook(build_template_workbook(), "backend_export_import_template.xlsx")
 
 
 @router.get("/test-template/logic")
 def download_logic_test_template() -> StreamingResponse:
-    return _download_workbook(build_logic_test_workbook(), "labor_fee_simple_0709_logic_test_template.xlsx")
+    return _download_workbook(build_logic_test_workbook(), "backend_export_logic_test_template.xlsx")
 
 
 @router.get("/test-template/error")
 def download_error_test_template() -> StreamingResponse:
-    return _download_workbook(build_error_test_workbook(), "labor_fee_simple_0709_error_test_template.xlsx")
+    return _download_workbook(build_error_test_workbook(), "backend_export_error_test_template.xlsx")
 
 
 @router.post("/calculate/upload")
