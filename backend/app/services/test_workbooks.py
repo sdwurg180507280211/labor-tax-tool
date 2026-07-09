@@ -92,6 +92,24 @@ def _style_table(ws, max_col: int) -> None:
                 cell.font = Font(bold=True)
 
 
+def _clear_fill(cell) -> None:
+    cell.fill = PatternFill(fill_type=None)
+
+
+def _remove_export_input_highlights(wb: Workbook) -> None:
+    """Remove yellow/manual-entry hints from exported result workbooks."""
+    for sheet_name in ("劳务费税费换算台账", "公式版台账"):
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        for coord in ("A1", "J1"):
+            ws[coord].value = None
+            _clear_fill(ws[coord])
+        for row in ws.iter_rows(min_row=6, max_row=ws.max_row, min_col=1, max_col=10):
+            for cell in row:
+                _clear_fill(cell)
+
+
 def _build_input_workbook(title: str, rows: list[list[object]], note: str, expected_rows: list[list[str]] | None = None) -> bytes:
     wb = Workbook()
     ws = wb.active
@@ -211,6 +229,7 @@ def _write_test_report_sheet(ws, rows: list[LaborCalculatedRow]) -> None:
 
 def build_result_workbook(input_rows: list[LaborInputRow]) -> bytes:
     wb = load_workbook(BytesIO(build_base_result_workbook(input_rows)))
+    _remove_export_input_highlights(wb)
     if "测试核对报告" in wb.sheetnames:
         del wb["测试核对报告"]
     ws = wb.create_sheet("测试核对报告")
