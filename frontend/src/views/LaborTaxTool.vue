@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">无登录 · 不入库 · 上传即算 · 导出即走</p>
         <h1>劳务费税费换算工具</h1>
-        <p class="desc">上传后台导出的劳务明细，系统按“年份 + 月份 + 讲者ID”累计，自动计算税前金额、个税、增值税、附加税、应开票金额和应付款金额。</p>
+        <p class="desc">上传新版简版0709劳务明细，系统按“年月+讲者ID”算个税，按“年月日+讲者ID”算增值税和协议签订金额。</p>
       </div>
       <div class="template-actions">
         <button class="secondary" @click="handleDownloadTemplate">下载导入模板</button>
@@ -18,7 +18,7 @@
         <input v-model="testMode" type="checkbox" />
         <span>
           <strong>测试模式</strong>
-          <em>开启后，结果预览会显示累计维度、税后反推档位、个税档位、增值税规则和核对状态，方便排查公式逻辑。</em>
+          <em>开启后，结果预览会显示月累计维度、日累计维度、税后反推档位、个税档位和增值税规则。</em>
         </span>
       </label>
     </section>
@@ -37,9 +37,10 @@
 
     <section v-if="summary" class="summary-grid">
       <div class="summary-card"><span>数据行数</span><strong>{{ summary.row_count }}</strong></div>
-      <div class="summary-card"><span>税后金额合计</span><strong>{{ summary.total_after_tax_amount }}</strong></div>
-      <div class="summary-card"><span>应开票金额合计</span><strong>{{ summary.total_invoice_amount }}</strong></div>
-      <div class="summary-card"><span>应付款金额合计</span><strong>{{ summary.total_payment_amount }}</strong></div>
+      <div class="summary-card"><span>实付金额合计</span><strong>{{ summary.total_after_tax_amount }}</strong></div>
+      <div class="summary-card"><span>协议签订金额合计</span><strong>{{ summary.total_contract_amount }}</strong></div>
+      <div class="summary-card"><span>增值税合计</span><strong>{{ summary.total_vat_amount }}</strong></div>
+      <div class="summary-card"><span>附加税合计</span><strong>{{ summary.total_surcharge_amount }}</strong></div>
       <div class="summary-card"><span>个税合计</span><strong>{{ summary.total_individual_tax_amount }}</strong></div>
     </section>
 
@@ -47,8 +48,8 @@
       <div class="result-actions">
         <div>
           <h2>计算结果预览</h2>
-          <p>页面仅展示核心字段；导出 Excel 会包含“原表格式台账”“清晰版台账”“公式版台账”“测试核对报告”四个 Sheet。</p>
-          <p v-if="testMode" class="debug-hint">测试模式已开启：当前表格额外显示每行计算档位和公式排查信息。</p>
+          <p>页面仅展示核心字段；导出 Excel 会生成新版简版台账和规则说明。</p>
+          <p v-if="testMode" class="debug-hint">测试模式已开启：当前表格额外显示每行计算维度和规则排查信息。</p>
         </div>
         <div class="action-row">
           <button class="secondary" @click="clearResult">清空结果</button>
@@ -100,17 +101,9 @@ function applyResult(payload) {
   summary.value = payload.summary || null
 }
 
-function handleDownloadTemplate() {
-  runTask(async () => downloadTemplate())
-}
-
-function handleDownloadLogicTestTemplate() {
-  runTask(async () => downloadLogicTestTemplate())
-}
-
-function handleDownloadErrorTestTemplate() {
-  runTask(async () => downloadErrorTestTemplate())
-}
+function handleDownloadTemplate() { runTask(async () => downloadTemplate()) }
+function handleDownloadLogicTestTemplate() { runTask(async () => downloadLogicTestTemplate()) }
+function handleDownloadErrorTestTemplate() { runTask(async () => downloadErrorTestTemplate()) }
 
 function handleUploadCalculate(file) {
   runTask(async () => {
@@ -126,9 +119,7 @@ function handleManualCalculate(rows) {
   })
 }
 
-function handleExport() {
-  runTask(async () => exportLedger(inputRows.value))
-}
+function handleExport() { runTask(async () => exportLedger(inputRows.value)) }
 
 function clearResult() {
   resultRows.value = []
