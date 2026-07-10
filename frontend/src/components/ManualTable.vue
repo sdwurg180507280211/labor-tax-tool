@@ -2,8 +2,8 @@
   <div class="panel">
     <div class="manual-toolbar">
       <div>
-        <h3>手动录入 / 从 Excel 粘贴</h3>
-        <p>可以直接在表格里输入，也可以从 Excel 复制整块数据后粘贴到下方任意单元格。</p>
+        <h3>在线输入 / 从 Excel 粘贴</h3>
+        <p>适合少量数据临时测算。后台批量数据仍建议用“上传后台导出表格”。</p>
       </div>
       <div class="action-row">
         <button class="secondary" @click="addRow">新增一行</button>
@@ -30,7 +30,7 @@
         </tbody>
       </table>
     </div>
-    <p class="hint">必填字段：年份、月份、讲者姓名、讲者ID、劳务费（实付金额）。</p>
+    <p class="hint">必填字段：年份、月份、日期、讲者姓名、讲者ID、劳务费（实付金额）。</p>
   </div>
 </template>
 
@@ -43,10 +43,8 @@ const emit = defineEmits(['calculate'])
 const columns = [
   { key: 'year', label: '年份', type: 'number', required: true, placeholder: '2026' },
   { key: 'month', label: '月份', type: 'number', required: true, placeholder: '6' },
+  { key: 'day', label: '日期', type: 'number', required: true, placeholder: '1' },
   { key: 'department', label: '事业部' },
-  { key: 'province', label: '省区' },
-  { key: 'reimburser', label: '发起人/报销人' },
-  { key: 'accountant', label: '会计' },
   { key: 'name', label: '讲者姓名', required: true },
   { key: 'id_no', label: '讲者ID', required: true },
   { key: 'after_tax_amount', label: '劳务费（实付金额）', type: 'number', required: true, placeholder: '3000' }
@@ -54,7 +52,7 @@ const columns = [
 
 let idSeed = 1
 function blankRow() {
-  return { _id: idSeed++, year: new Date().getFullYear(), month: '', department: '', province: '', reimburser: '', accountant: '', name: '', id_no: '', after_tax_amount: '' }
+  return { _id: idSeed++, year: new Date().getFullYear(), month: '', day: '', department: '', name: '', id_no: '', after_tax_amount: '' }
 }
 const rows = ref([blankRow(), blankRow(), blankRow()])
 
